@@ -271,7 +271,7 @@ with tab4:
                 - {'Higher k₀ values lead to more reversible behavior with smaller peak separation' if et_rate > 1e-2 else 'Lower k₀ values lead to irreversible behavior with larger peak separation'}
                 - {'The peaks are nearly symmetric and the peak separation approaches 59 mV/n' if Lambda > 15 else ''}
                 """)
-    with tab4:
+        with tab4:
         st.subheader("Educational Resources")
         
         edu_tab1, edu_tab2, edu_tab3 = st.tabs(["CV Basics", "EC Mechanism", "Interactive Demos"])
