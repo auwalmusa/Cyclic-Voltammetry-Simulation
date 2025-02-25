@@ -260,22 +260,51 @@ def create_streamlit_app():
     max_current_idx = np.argmax(current)
     min_current_idx = np.argmin(current)
     
+    # Calculate optimal offsets that keep labels inside the plot
+    y_range = max(current) - min(current)
+    
+    # Plot the points
     ax.plot(eta[max_current_idx], current[max_current_idx], 'ro')
-    ax.annotate(f'({eta[max_current_idx]:.2f}V, {current[max_current_idx]:.2f})', 
-                xy=(eta[max_current_idx], current[max_current_idx]),
-                xytext=(eta[max_current_idx], current[max_current_idx] + (max(current) - min(current))*0.05),
-                ha='center', va='bottom',
-                bbox=dict(boxstyle='round,pad=0.3', fc='white', alpha=0.7))
-    
     ax.plot(eta[min_current_idx], current[min_current_idx], 'ro')
-    ax.annotate(f'({eta[min_current_idx]:.2f}V, {current[min_current_idx]:.2f})', 
-                xy=(eta[min_current_idx], current[min_current_idx]),
-                xytext=(eta[min_current_idx], current[min_current_idx] - (max(current) - min(current))*0.05),
-                ha='center', va='top',
-                bbox=dict(boxstyle='round,pad=0.3', fc='white', alpha=0.7))
     
-    # Plot settings
-    plt.tight_layout()
+    # Add compact labels directly on the plot
+    max_label = f"({eta[max_current_idx]:.2f}V, {current[max_current_idx]:.2f})"
+    min_label = f"({eta[min_current_idx]:.2f}V, {current[min_current_idx]:.2f})"
+    
+    # For the maximum peak (typically at the top of the plot)
+    if current[max_current_idx] > 0:
+        # If in upper half, place label below the point
+        y_offset = -y_range * 0.05
+        va = 'top'
+    else:
+        # If in lower half, place label above the point
+        y_offset = y_range * 0.05
+        va = 'bottom'
+        
+    ax.annotate(max_label, 
+                xy=(eta[max_current_idx], current[max_current_idx]),
+                xytext=(eta[max_current_idx], current[max_current_idx] + y_offset),
+                ha='center', va=va,
+                bbox=dict(boxstyle='round,pad=0.2', fc='white', alpha=0.7, ec='gray'))
+    
+    # For the minimum peak (typically at the bottom of the plot)
+    if current[min_current_idx] < 0:
+        # If in lower half, place label above the point
+        y_offset = y_range * 0.05
+        va = 'bottom'
+    else:
+        # If in upper half, place label below the point
+        y_offset = -y_range * 0.05
+        va = 'top'
+        
+    ax.annotate(min_label, 
+                xy=(eta[min_current_idx], current[min_current_idx]),
+                xytext=(eta[min_current_idx], current[min_current_idx] + y_offset),
+                ha='center', va=va,
+                bbox=dict(boxstyle='round,pad=0.2', fc='white', alpha=0.7, ec='gray'))
+    
+    # Make sure plot has enough margins
+    fig.subplots_adjust(left=0.15, right=0.95, top=0.9, bottom=0.15)
     st.pyplot(fig)
     
     # Download options
