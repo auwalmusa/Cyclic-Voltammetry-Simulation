@@ -272,9 +272,9 @@ with tab4:
                 - {'The peaks are nearly symmetric and the peak separation approaches 59 mV/n' if Lambda > 15 else ''}
                 """)
         with tab4:
-        st.subheader("Educational Resources")
+            st.subheader("Educational Resources")
         
-        edu_tab1, edu_tab2, edu_tab3 = st.tabs(["CV Basics", "EC Mechanism", "Interactive Demos"])
+            edu_tab1, edu_tab2, edu_tab3 = st.tabs(["CV Basics", "EC Mechanism", "Interactive Demos"])
         
         with edu_tab1:
             st.markdown("""
