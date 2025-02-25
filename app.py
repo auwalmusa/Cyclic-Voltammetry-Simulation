@@ -361,7 +361,8 @@ with tab4:
             potential = np.linspace(0.5, -0.5, 1000)
             
             # Simulate reversible response (no chemical reaction)
-            current_rev = -10 * (np.exp(-40*(potential-0.05)) - np.exp(-40*(potential+0.05))) /import numpy as np
+            
+            current_rev = -10 * (np.exp(-40*(potential-0.05)) - np.exp(-40*(potential+0.05))) / (1 + np.exp(-40*(potential-0.05)) + np.exp(-40*(potential+0.05)))
 import matplotlib.pyplot as plt
 import streamlit as st
 
