@@ -261,15 +261,21 @@ def create_streamlit_app():
     min_current_idx = np.argmin(current)
     
     ax.plot(eta[max_current_idx], current[max_current_idx], 'ro')
-    ax.text(eta[max_current_idx], current[max_current_idx]*1.05, 
-            f'({eta[max_current_idx]:.2f}V, {current[max_current_idx]:.2f})', 
-            horizontalalignment='center')
+    ax.annotate(f'({eta[max_current_idx]:.2f}V, {current[max_current_idx]:.2f})', 
+                xy=(eta[max_current_idx], current[max_current_idx]),
+                xytext=(eta[max_current_idx], current[max_current_idx] + (max(current) - min(current))*0.05),
+                ha='center', va='bottom',
+                bbox=dict(boxstyle='round,pad=0.3', fc='white', alpha=0.7))
     
     ax.plot(eta[min_current_idx], current[min_current_idx], 'ro')
-    ax.text(eta[min_current_idx], current[min_current_idx]*1.1, 
-            f'({eta[min_current_idx]:.2f}V, {current[min_current_idx]:.2f})', 
-            horizontalalignment='center')
+    ax.annotate(f'({eta[min_current_idx]:.2f}V, {current[min_current_idx]:.2f})', 
+                xy=(eta[min_current_idx], current[min_current_idx]),
+                xytext=(eta[min_current_idx], current[min_current_idx] - (max(current) - min(current))*0.05),
+                ha='center', va='top',
+                bbox=dict(boxstyle='round,pad=0.3', fc='white', alpha=0.7))
     
+    # Plot settings
+    plt.tight_layout()
     st.pyplot(fig)
     
     # Download options
