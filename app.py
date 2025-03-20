@@ -1,8 +1,9 @@
 import streamlit as st
 import numpy as np
 import matplotlib.pyplot as plt
+import io
 
-# Define the CV simulation function
+# Define the CV simulation function (Standard Model)
 def run_cv_simulation(C, D, etai, etaf, v, n, alpha, k0, kc, T):
     """
     Cyclic voltammetry simulation for EC mechanism
@@ -58,44 +59,105 @@ def run_cv_simulation(C, D, etai, etaf, v, n, alpha, k0, kc, T):
     
     # Main simulation loop
     for i1 in range(L):
-        # Update bulk concentrations of O and R
         for i2 in range(1, j-1):
             O[i1+1, i2] = O[i1, i2] + DM * (O[i1, i2+1] + O[i1, i2-1] - 2*O[i1, i2])
             R[i1+1, i2] = R[i1, i2] + DM * (R[i1, i2+1] + R[i1, i2-1] - 2*R[i1, i2]) - km * R[i1, i2]
         
-        # Update flux
         JO[i1+1] = (kf[i1+1] * O[i1+1, 1] - kb[i1+1] * R[i1+1, 1]) / (1 + Dx/D * (kf[i1+1] + kb[i1+1]))
-        
-        # Update surface concentrations
         O[i1+1, 0] = O[i1+1, 1] - JO[i1+1] * (Dx/D)
         R[i1+1, 0] = R[i1+1, 1] + JO[i1+1] * (Dx/D) - km * R[i1+1, 0]
     
-    # Calculate current density from flux of O
     Z = -n * F * JO * 1000  # [A/cm^2 -> mA/cm^2]
-    
-    # Ensure eta and Z are the same length
     if len(eta) > len(Z):
         eta = eta[:len(Z)]
     
     return eta, Z
 
+# Helper function to convert data to CSV
+def convert_to_csv(data, header='Potential (V),Current'):
+    csv_io = io.StringIO()
+    np.savetxt(csv_io, data, delimiter=',', header=header, comments='')
+    return csv_io.getvalue()
+
 # Main Streamlit app
 def create_streamlit_app():
     st.set_page_config(page_title="Cyclic Voltammetry Simulator", layout="wide")
     st.title("Cyclic Voltammetry Simulator")
+    st.write("Based on Bard and Faulkner, Appendix B - EC mechanism")
     
     # Define top-level tabs
     tab1, tab2, tab3, tab4 = st.tabs(["Simulator", "Parameter Study", "Compare Models", "Educational"])
     
-    # Tab 1: Simulator (placeholder for now)
+    # Tab 1: Simulator
     with tab1:
-        st.write("Simulator functionality to be implemented here.")
+        col1, col2 = st.columns([1, 2])
+        
+        with col1:
+            st.subheader("Simulation Parameters")
+            
+            C = st.number_input("Concentration [mol/L]", min_value=0.01, max_value=10.0, value=1.0, step=0.1)
+            D = st.number_input("Diffusion coef. [cm²/s]", min_value=1e-6, max_value=1e-4, value=1e-5, format="%.1e", step=1e-6)
+            
+            st.subheader("Potential Settings")
+            etai = st.slider("Initial E [V]", min_value=-1.0, max_value=1.0, value=0.2, step=0.1)
+            etaf = st.slider("Final E [V]", min_value=-1.0, max_value=1.0, value=-0.2, step=0.1)
+            v = st.number_input("Sweep rate [V/s]", min_value=1e-4, max_value=1.0, value=1e-3, format="%.1e", step=1e-4)
+            
+            with st.expander("Advanced Parameters"):
+                n = st.number_input("Electrons transferred", min_value=0.1, max_value=10.0, value=1.0, step=0.1)
+                alpha = st.number_input("Transfer coefficient", min_value=0.1, max_value=0.9, value=0.5, step=0.1)
+                k0 = st.number_input("Rate constant [cm/s]", min_value=1e-5, max_value=1.0, value=1e-2, format="%.1e", step=1e-3)
+                kc = st.number_input("Chemical rate [1/s]", min_value=1e-5, max_value=10.0, value=1e-3, format="%.1e", step=1e-4)
+                T = st.number_input("Temperature [K]", min_value=273.15, max_value=373.15, value=298.15, step=5.0)
+        
+        with col2:
+            eta, current = run_cv_simulation(C, D, etai, etaf, v, n, alpha, k0, kc, T)
+            y_label = "Current density (mA/cm²)"
+            title = "Cyclic Voltammogram (Standard Model)"
+            file_name = "cv_simulation_data.csv"
+            header = 'Potential (V),Current (mA/cm²)'
+            
+            # Display key parameters
+            tk = 2*(etai-etaf)/v
+            ktk = kc*tk
+            km = ktk/500  # L=500
+            F = 96485
+            R = 8.3145
+            f = F/(R*T)
+            Lambda = k0/(D*f*v)**0.5
+            
+            param_col1, param_col2, param_col3 = st.columns(3)
+            with param_col1:
+                st.metric("Kinetic param (k·tₖ)", f"{ktk:.2e}")
+            with param_col2:
+                st.metric("Norm. kinetic (k·tₖ/L)", f"{km:.2e}", delta="Warning!" if km > 0.1 else "OK", delta_color="off" if km <= 0.1 else "red")
+            with param_col3:
+                st.metric("Reversibility (Λ)", f"{Lambda:.2e}")
+            
+            # Plot the results
+            fig, ax = plt.subplots(figsize=(6, 4))
+            ax.plot(eta, current)
+            ax.set_xlabel('Overpotential (V)')
+            ax.set_ylabel(y_label)
+            ax.set_title(title)
+            ax.grid(True, linestyle='--', alpha=0.7)
+            fig.subplots_adjust(left=0.15, right=0.95, top=0.9, bottom=0.15)
+            st.pyplot(fig)
+            
+            # Download button
+            csv_data = np.column_stack((eta, current))
+            st.download_button(
+                label="Download Data as CSV",
+                data=convert_to_csv(csv_data, header),
+                file_name=file_name,
+                mime="text/csv"
+            )
     
-    # Tab 2: Parameter Study (placeholder for now)
+    # Tab 2: Parameter Study (placeholder)
     with tab2:
         st.write("Parameter Study functionality to be implemented here.")
     
-    # Tab 3: Compare Models (placeholder for now)
+    # Tab 3: Compare Models (placeholder)
     with tab3:
         st.write("Compare Models functionality to be implemented here.")
     
@@ -116,14 +178,9 @@ def create_streamlit_app():
             **The CV waveform:** 
             """)
             
-            # Create example CV waveform
             fig, ax = plt.subplots(figsize=(6, 3))
             time = np.linspace(0, 10, 1000)
-            potential = np.concatenate([
-                np.linspace(0, 0.5, 250),
-                np.linspace(0.5, -0.5, 500),
-                np.linspace(-0.5, 0, 250)
-            ])
+            potential = np.concatenate([np.linspace(0, 0.5, 250), np.linspace(0.5, -0.5, 500), np.linspace(-0.5, 0, 250)])
             ax.plot(time, potential)
             ax.set_xlabel('Time')
             ax.set_ylabel('Potential (V)')
@@ -183,7 +240,6 @@ def create_streamlit_app():
             ### Characteristic Features:
             """)
             
-            # Create comparison of reversible vs EC voltammograms
             fig, ax = plt.subplots(figsize=(7, 4))
             potential = np.linspace(0.5, -0.5, 1000)
             current_rev = -10 * (np.exp(-40*(potential-0.05)) - np.exp(-40*(potential+0.05))) / (1 + np.exp(-40*(potential-0.05)) + np.exp(-40*(potential+0.05)))
@@ -231,26 +287,11 @@ def create_streamlit_app():
                 """)
                 
                 sweep_rate = st.slider("Scan rate (V/s)", min_value=0.001, max_value=1.0, value=0.01, step=0.01, format="%.3f")
-                
-                # Fixed parameters
-                demo_C = 1.0
-                demo_D = 1e-5
-                demo_etai = 0.5
-                demo_etaf = -0.5
-                demo_n = 1.0
-                demo_alpha = 0.5
-                demo_k0 = 1e-2
-                demo_kc = 0.5
-                demo_T = 298.15
-                
-                # Run simulation
+                demo_C, demo_D, demo_etai, demo_etaf, demo_n, demo_alpha, demo_k0, demo_kc, demo_T = 1.0, 1e-5, 0.5, -0.5, 1.0, 0.5, 1e-2, 0.5, 298.15
                 eta_demo, current_demo = run_cv_simulation(demo_C, demo_D, demo_etai, demo_etaf, sweep_rate, demo_n, demo_alpha, demo_k0, demo_kc, demo_T)
-                
-                # Calculate parameters
                 tk_demo = 2*(demo_etai-demo_etaf)/sweep_rate
                 ktk_demo = demo_kc*tk_demo
                 
-                # Create plot
                 fig, ax = plt.subplots(figsize=(7, 4))
                 ax.plot(eta_demo, current_demo)
                 ax.set_xlabel('Potential (V)')
@@ -259,7 +300,6 @@ def create_streamlit_app():
                 ax.grid(True, linestyle='--', alpha=0.7)
                 st.pyplot(fig)
                 
-                # Explanation
                 st.markdown(f"""
                 **Observations:**
                 
@@ -276,26 +316,11 @@ def create_streamlit_app():
                 """)
                 
                 chem_rate = st.slider("Chemical reaction rate constant (s⁻¹)", min_value=0.001, max_value=10.0, value=0.5, step=0.1, format="%.3f")
-                
-                # Fixed parameters
-                demo_C = 1.0
-                demo_D = 1e-5
-                demo_etai = 0.5
-                demo_etaf = -0.5
-                demo_sweep_rate = 0.05
-                demo_n = 1.0
-                demo_alpha = 0.5
-                demo_k0 = 1e-2
-                demo_T = 298.15
-                
-                # Run simulation
+                demo_C, demo_D, demo_etai, demo_etaf, demo_sweep_rate, demo_n, demo_alpha, demo_k0, demo_T = 1.0, 1e-5, 0.5, -0.5, 0.05, 1.0, 0.5, 1e-2, 298.15
                 eta_demo, current_demo = run_cv_simulation(demo_C, demo_D, demo_etai, demo_etaf, demo_sweep_rate, demo_n, demo_alpha, demo_k0, chem_rate, demo_T)
-                
-                # Calculate parameters
                 tk_demo = 2*(demo_etai-demo_etaf)/demo_sweep_rate
                 ktk_demo = chem_rate*tk_demo
                 
-                # Create plot
                 fig, ax = plt.subplots(figsize=(7, 4))
                 ax.plot(eta_demo, current_demo)
                 ax.set_xlabel('Potential (V)')
@@ -304,7 +329,6 @@ def create_streamlit_app():
                 ax.grid(True, linestyle='--', alpha=0.7)
                 st.pyplot(fig)
                 
-                # Explanation
                 st.markdown(f"""
                 **Observations:**
                 
@@ -321,28 +345,11 @@ def create_streamlit_app():
                 """)
                 
                 et_rate = st.slider("Electron transfer rate constant (cm/s)", min_value=1e-5, max_value=1e-1, value=1e-3, format="%.1e")
-                
-                # Fixed parameters
-                demo_C = 1.0
-                demo_D = 1e-5
-                demo_etai = 0.5
-                demo_etaf = -0.5
-                demo_sweep_rate = 0.05
-                demo_n = 1.0
-                demo_alpha = 0.5
-                demo_kc = 0.01
-                demo_T = 298.15
-                
-                # Run simulation
+                demo_C, demo_D, demo_etai, demo_etaf, demo_sweep_rate, demo_n, demo_alpha, demo_kc, demo_T = 1.0, 1e-5, 0.5, -0.5, 0.05, 1.0, 0.5, 0.01, 298.15
                 eta_demo, current_demo = run_cv_simulation(demo_C, demo_D, demo_etai, demo_etaf, demo_sweep_rate, demo_n, demo_alpha, et_rate, demo_kc, demo_T)
-                
-                # Calculate parameters
-                F = 96485
-                R = 8.3145
-                f = F/(R*demo_T)
+                F, R, f = 96485, 8.3145, F/(R*demo_T)
                 Lambda = et_rate/(demo_D*f*demo_sweep_rate)**0.5
                 
-                # Create plot
                 fig, ax = plt.subplots(figsize=(7, 4))
                 ax.plot(eta_demo, current_demo)
                 ax.set_xlabel('Potential (V)')
@@ -351,9 +358,7 @@ def create_streamlit_app():
                 ax.grid(True, linestyle='--', alpha=0.7)
                 st.pyplot(fig)
                 
-                # Explanation
                 reversibility = "Reversible" if Lambda > 15 else "Quasi-reversible" if Lambda > 1e-3 else "Irreversible"
-                
                 st.markdown(f"""
                 **Observations:**
                 
